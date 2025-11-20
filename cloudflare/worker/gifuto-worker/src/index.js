@@ -3,7 +3,7 @@
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type,X-Gifuto-Params,X-Gifuto-Config,X-Gifuto-Sketch-Key,X-Gifuto-User-ID",
 };
 
 function jsonResponse(body, status = 200) {
@@ -102,10 +102,27 @@ export default {
         const items = await loadItems(env);
         const publicUrl = `${url.origin}/media/${id}.${ext}`;
 
+        // メタデータ取得 (Headerから)
+        const sketchKey = request.headers.get("X-Gifuto-Sketch-Key") || "default";
+        const paramsJson = request.headers.get("X-Gifuto-Params") || "{}";
+        const configJson = request.headers.get("X-Gifuto-Config") || "{}";
+
+        let params = {};
+        let config = {};
+        try {
+          params = JSON.parse(paramsJson);
+          config = JSON.parse(configJson);
+        } catch (e) {
+          console.warn("metadata parse error", e);
+        }
+
         const item = {
           id,
           url: publicUrl,
           format: ext, // "webm" / "gif" / "webp" など
+          sketchKey,
+          params,
+          config,
           title: "",
           tags: [],
           createdAt: now,

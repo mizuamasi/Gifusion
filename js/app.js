@@ -7,9 +7,21 @@ class GifApp {
     this.canvas = null;
 
     this.currentSketchKey = initialSketchKey || "default";
-    this.sketch = SketchRegistry[this.currentSketchKey] || DefaultSketch;
+    // Registry構造変更に対応: .sketch と .params を取得
+    const entry = SketchRegistry[this.currentSketchKey] || SketchRegistry.default;
+    this.sketch = entry.sketch;
+    this.sketchParamsSchema = entry.params;
 
     this.t = 0;
+    this.currentParams = {}; // 現在のパラメータ値
+
+    // ParamControllerの初期化
+    const paramContainer = document.getElementById('params-container');
+    if (paramContainer) {
+      this.paramController = new ParamController(paramContainer, (newParams) => {
+        this.currentParams = { ...newParams };
+      });
+    }
   }
 
   getCurrentConfig() {
@@ -46,7 +58,15 @@ class GifApp {
     this.captureManager = new CaptureManager(cfg, this.canvas);
     UI = new UIController(this.captureManager, this);
 
+    UI = new UIController(this.captureManager, this);
+
     if (this.sketch.setup) this.sketch.setup();
+
+    // 初回UI構築
+    if (this.paramController) {
+      this.paramController.buildUI(this.sketchParamsSchema);
+      this.currentParams = this.paramController.getParams();
+    }
   }
 
   // ★ UIのsize変更イベントが呼ぶ関数
@@ -80,14 +100,37 @@ class GifApp {
     UI.updateStatus(`size: ${size}x${size}`);
   }
 
-  setSketch(key) {
-    const next = SketchRegistry[key];
-    if (!next) return;
+  // ★ GIFモードなどで強制的にサイズ変更する場合
+  forceSize(w, h) {
+    if (this.captureManager && this.captureManager.isRecording) return;
 
-    this.currentSketchKey = key;
-    this.sketch = next;
+    this.baseConfig.width = w;
+    this.baseConfig.height = h;
+
+    resizeCanvas(w, h);
+    this.captureManager.setSize(w, h);
 
     if (this.sketch.setup) this.sketch.setup();
+
+    UI.updateStatus(`Forced size: ${w}x${h}`);
+  }
+
+  setSketch(key) {
+    const entry = SketchRegistry[key];
+    if (!entry) return;
+
+    this.currentSketchKey = key;
+    this.sketch = entry.sketch;
+    this.sketchParamsSchema = entry.params;
+
+    if (this.sketch.setup) this.sketch.setup();
+
+    // UI再構築
+    if (this.paramController) {
+      this.paramController.buildUI(this.sketchParamsSchema);
+      // 初期値を反映
+      this.currentParams = this.paramController.getParams();
+    }
   }
 
   draw() {
@@ -102,7 +145,9 @@ class GifApp {
     // t は「1周分」の中で 0〜1 を行き来する
     this.t = (f % loopFrames) / loopFrames;
 
-    this.sketch.draw(this.t);
+    this.t = (f % loopFrames) / loopFrames;
+
+    this.sketch.draw(this.t, this.currentParams);
     this.captureManager.onFrame();
   }
 }
