@@ -1,37 +1,45 @@
-// const fetch = require('node-fetch'); // Native fetch in Node 18+
+const fs = require('fs');
+const path = require('path');
 
-const API_URL = "https://gifuto-worker.rekahsnnig.workers.dev/api/upload";
+// const API_URL = "https://gifuto-worker.kenco-pc.workers.dev/api/renders";
+const API_URL = "http://localhost:8787/api/renders"; // Local worker
 
-async function testUpload() {
-    // Create a dummy buffer (not a real WebM, but enough to test upload flow)
-    const buffer = Buffer.from("dummy webm content");
+async function upload() {
+    const filePath = path.join(__dirname, "test_video.webm");
 
-    console.log("Uploading to:", API_URL);
+    // Create dummy file if not exists
+    if (!fs.existsSync(filePath)) {
+        fs.writeFileSync(filePath, Buffer.alloc(1024)); // 1KB dummy
+    }
+
+    const stats = fs.statSync(filePath);
+    const fileSizeInBytes = stats.size;
+    const fileStream = fs.createReadStream(filePath);
+
+    console.log(`Uploading ${filePath} (${fileSizeInBytes} bytes)...`);
 
     try {
         const res = await fetch(API_URL, {
-            method: "POST",
+            method: 'POST',
             headers: {
-                "Content-Type": "video/webm",
-                "X-Gifuto-Sketch-Key": "test",
-                "X-Gifuto-Params": "{}",
-                "X-Gifuto-Config": '{"durationSec": 1}'
+                'Content-Type': 'video/webm',
+                'X-Gifuto-Sketch-Key': 'test-sketch',
+                'X-Gifuto-Params': JSON.stringify({ color: '#ff0000' }),
+                'X-Gifuto-Config': JSON.stringify({ duration: 10 })
             },
-            body: buffer
+            body: fs.readFileSync(filePath) // Use sync read for simplicity with fetch in node
         });
 
         if (!res.ok) {
-            console.error("Upload failed:", res.status, await res.text());
-            return;
+            const text = await res.text();
+            throw new Error(`Upload failed: ${res.status} ${text}`);
         }
 
         const data = await res.json();
-        console.log("Upload successful!");
-        console.log(JSON.stringify(data, null, 2));
-
-    } catch (e) {
-        console.error("Error:", e);
+        console.log("Upload Success:", data);
+    } catch (error) {
+        console.error("Error:", error);
     }
 }
 
-testUpload();
+upload();

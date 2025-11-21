@@ -1,245 +1,226 @@
 // js/app.js
 
 class GifApp {
-  constructor(config, initialSketchKey) {
-    this.baseConfig = { ...config };
-    this.captureManager = null;
-    this.canvas = null;
+  constructor() {
+    window.app = this; // Debug access
+    this.sketch = null;
+    this.p5Instance = null;
+    this.canvas = document.getElementById("p5-canvas");
 
-    this.currentSketchKey = initialSketchKey || "default";
-    this.sketches = SketchRegistry || {};
-
-    // Registry handling
-    const entry = this.sketches[this.currentSketchKey] || this.sketches.default;
-    this.sketch = entry ? entry.sketch : { setup: () => { }, draw: () => { } };
-    this.sketchParamsSchema = entry ? entry.params : {};
-
-    this.t = 0;
     this.currentParams = {};
+    this.currentSketchId = null;
+    this.currentSchema = {};
 
-    // ParamController initialization
-    const paramContainer = document.getElementById('params-container');
-    if (paramContainer && typeof ParamController !== 'undefined') {
-      this.paramController = new ParamController(paramContainer, (newParams) => {
-        this.currentParams = { ...newParams };
-      });
-    }
-  }
+    // Config for recording
+    this.baseDuration = 2; // seconds
+    this.loopCount = 5;
+    this.totalDuration = 10; // Fixed 10s
 
-  getCurrentConfig() {
-    const durationInput = document.getElementById("input-duration");
-    const sizeSelect = document.getElementById("select-size");
-
-    let durationSec = this.baseConfig.durationSec || 3;
-    if (durationInput) {
-      const raw = parseFloat(durationInput.value);
-      if (!Number.isNaN(raw) && raw > 0) durationSec = raw;
-    }
-
-    let size = this.baseConfig.width || 512;
-    if (sizeSelect) {
-      const raw = parseInt(sizeSelect.value, 10);
-      if (!Number.isNaN(raw) && raw > 0) size = raw;
-    }
-
-    return {
-      ...this.baseConfig,
-      width: size,
-      height: size,
-      durationSec,
-      fps: 30
-    };
+    this.captureManager = null;
+    this.ui = null;
+    this.paramController = null;
   }
 
   setup() {
-    const cfg = this.getCurrentConfig();
-    this.baseConfig = { ...cfg };
+    this.captureManager = new CaptureManager({
+      fps: 30,
+      duration: this.totalDuration
+    }, this.canvas);
 
-    const c = createCanvas(cfg.width, cfg.height);
-    this.canvas = c.canvas;
+    this.ui = new UIController(this.captureManager, this);
+    this.captureManager.setUI(this.ui);
+    this.paramController = new ParamController("params-container", this);
 
-    // Initialize CaptureManager
-    if (typeof CaptureManager !== 'undefined') {
-      this.captureManager = new CaptureManager(cfg, this.canvas);
-
-      // Initialize UIController
-      if (typeof UIController !== 'undefined') {
-        UI = new UIController(this.captureManager, this);
-        this.captureManager.setUI(UI);
-      }
-    }
-
-    this.runCurrentSketch();
-
-    // Initial UI build
-    if (this.paramController && this.sketchParamsSchema) {
-      this.paramController.buildUI(this.sketchParamsSchema);
-      this.currentParams = this.paramController.getParams();
-    }
+    // Initial sketch
+    this.loadDefaultSketch();
   }
 
-  runCurrentSketch() {
-    if (this.sketch && this.sketch.setup) {
-      this.sketch.setup();
-    }
-    background(0);
-  }
+  loadDefaultSketch() {
+    const defaultCode = `
+export const gifuParams = {
+  message: { type: 'string', default: 'Hello World', label: 'Message' },
+  bg: { type: 'color', default: '#222222', label: 'Background' },
+  speed: { type: 'number', default: 1, min: 0.1, max: 5, step: 0.1, label: 'Speed' }
+};
 
-  updateSizeFromUI() {
-    if (this.captureManager && this.captureManager.isRecording) {
-      if (UI) UI.updateStatus("Cannot change size while recording");
-      return;
-    }
+export function createSketch(p) {
+  let params = {};
 
-    const cfg = this.getCurrentConfig();
-    this.baseConfig.width = cfg.width;
-    this.baseConfig.height = cfg.height;
+  p.setup = function() {
+    p.createCanvas(512, 512);
+    p.textAlign(p.CENTER, p.CENTER);
+    p.textSize(32);
+    p.noStroke();
+  };
 
-    resizeCanvas(cfg.width, cfg.height);
+  p.draw = function() {
+    let t = (p.millis() / 1000) % 2; // 2 sec loop base
+    if (params.speed) t *= params.speed;
+    
+    p.background(params.bg || 0);
+    p.fill(255);
+    
+    let y = p.height / 2 + p.sin(t * p.TWO_PI) * 50;
+    p.text(params.message || "", p.width / 2, y);
+  };
 
-    if (this.captureManager) {
-      this.captureManager.updateConfig(cfg);
-    }
-
-    this.runCurrentSketch();
-
-    if (UI) UI.updateStatus(`Size: ${cfg.width}x${cfg.height}`);
-  }
-
-  setSketch(key) {
-    const entry = this.sketches[key];
-    if (!entry) return;
-
-    this.currentSketchKey = key;
-    this.sketch = entry.sketch;
-    this.sketchParamsSchema = entry.params;
-
-    this.runCurrentSketch();
-
-    // Rebuild UI
-    if (this.paramController) {
-      this.paramController.buildUI(this.sketchParamsSchema);
-      this.currentParams = this.paramController.getParams();
-    }
-
-    // Update Editor if UI exists
-    if (UI && UI.editor) {
-      UI.editor.setValue(`// Preset: ${key}\n// Switch to 'Custom' or edit code to override.`);
-    }
-  }
-
-  setDuration(val) {
-    this.baseConfig.durationSec = val;
-    if (this.captureManager) {
-      this.captureManager.updateConfig({ durationSec: val });
-    }
-  }
-
-  setSize(w, h) {
-    this.baseConfig.width = w;
-    this.baseConfig.height = h;
-    resizeCanvas(w, h);
-    if (this.captureManager) {
-      this.captureManager.updateConfig({ width: w, height: h });
-    }
-    this.runCurrentSketch();
+  p.updateParams = function(newParams) {
+    params = newParams;
+  };
+}
+`;
+    this.compileSketch(defaultCode);
+    if (this.ui.editor) this.ui.editor.setValue(defaultCode);
   }
 
   compileSketch(code) {
     try {
-      // Create a function from the code string
-      const func = new Function("p5", `
-        let setup = null;
-        let draw = null;
-        
-        ${code}
-        
-        return { setup, draw };
-      `);
+      // Create a module-like environment
+      const mockExports = {};
 
-      const result = func(window);
+      // Check if the user is using the "Gifusion Module Mode" (export function createSketch)
+      const isModuleMode = /export\s+function\s+createSketch/.test(code);
 
-      if (result.setup || result.draw) {
-        this.currentSketchKey = "custom";
-        this.sketch = {
-          setup: result.setup || (() => background(0)),
-          draw: result.draw || (() => { }),
-          params: {}
-        };
-        this.sketchParamsSchema = {};
-        this.currentParams = {};
+      let safeCode;
 
-        // Clear params UI
-        if (this.paramController) {
-          document.getElementById('params-container').innerHTML = '<div style="padding:10px; color:#888;">Custom code active</div>';
+      if (isModuleMode) {
+        // --- Module Mode (Existing Logic) ---
+        safeCode = code
+          .replace(/export\s+const\s+/g, "mockExports.")
+          .replace(/export\s+function\s+(\w+)/g, "mockExports.$1 = function $1");
+      } else {
+        // --- Global Mode Adapter (New Logic) ---
+        // Wrap user code in a function that uses 'with(p)' to expose p5 methods globally
+        // and captures setup/draw functions.
+
+        // We need to escape backticks in user code if we use template literals, 
+        // but here we construct the string directly.
+
+        safeCode = `
+          mockExports.createSketch = function(p) {
+            // p5 Global Mode Adapter
+            // We use 'with(p)' to make p5 methods available as globals (e.g. rect(), fill())
+            with(p) {
+              // Execute user code
+              ${code}
+
+              // Bind setup/draw if defined in this scope
+              // Note: function declarations inside 'with' are tricky.
+              // If the user wrote 'function setup() {}', it should be visible here.
+              
+              if (typeof setup === 'function') {
+                p.setup = setup;
+              }
+              
+              if (typeof draw === 'function') {
+                p.draw = draw;
+              }
+              
+              // Also bind other common p5 events if needed (mousePressed, etc.)
+              const events = ['mousePressed', 'mouseReleased', 'mouseClicked', 'mouseMoved', 'mouseDragged', 'keyPressed', 'keyReleased', 'keyTyped', 'windowResized'];
+              events.forEach(evt => {
+                if (typeof eval(evt) === 'function') {
+                   p[evt] = eval(evt);
+                }
+              });
+            }
+          };
+        `;
+      }
+
+      // Log the compiled code for debugging
+      console.log("=== COMPILED CODE ===\n", safeCode);
+
+      const runCode = new Function("mockExports", "p5", safeCode);
+      runCode(mockExports, this.p5Instance ? this.p5Instance : p5);
+
+      if (!mockExports.createSketch) {
+        throw new Error("createSketch function not found. Did you export it?");
+      }
+
+      this.currentSchema = mockExports.gifuParams || {};
+
+      // Re-initialize p5
+      if (this.p5Instance) {
+        this.p5Instance.remove();
+      }
+
+      this.p5Instance = new p5((p) => {
+        mockExports.createSketch(p);
+
+        // Inject internal updateParams if not present (safety)
+        if (!p.updateParams) {
+          p.updateParams = () => { };
         }
 
-        // Re-run setup
-        this.runCurrentSketch();
+        // Hook into draw for recording
+        const originalDraw = p.draw || (() => { });
+        p.draw = () => {
+          originalDraw();
+        };
+      }, "canvas-wrapper");
 
-        if (UI) UI.updateStatus("Code updated!");
-        console.log("Custom sketch compiled successfully");
-      } else {
-        throw new Error("No setup or draw function found in code.");
-      }
+      // Update CaptureManager with the real canvas element
+      setTimeout(() => {
+        const realCanvas = document.querySelector("#canvas-wrapper canvas");
+        if (realCanvas && this.captureManager) {
+          this.captureManager.canvas = realCanvas;
+        }
+      }, 100);
+
+      // Build UI
+      this.paramController.buildUI(this.currentSchema);
+
+      console.log("Sketch compiled successfully");
 
     } catch (e) {
-      console.error("Compilation error:", e);
-      if (UI) UI.updateStatus("Error: " + e.message);
-      alert("Code Error:\n" + e.message);
+      console.error("Compilation Error:", e);
+      alert("Error compiling sketch: " + e.message);
+      this.loadErrorSketch();
     }
   }
 
-  draw() {
-    if (!this.captureManager) return;
+  loadErrorSketch() {
+    if (this.p5Instance) this.p5Instance.remove();
+    this.p5Instance = new p5((p) => {
+      p.setup = () => {
+        p.createCanvas(512, 512);
+        p.background(255, 0, 0);
+        p.fill(255);
+        p.textAlign(p.CENTER);
+        p.text("Error Loading Sketch", p.width / 2, p.height / 2);
+      };
+    }, "canvas-wrapper");
+  }
 
-    const cfg = this.captureManager.config;
-    const durationSec = cfg.durationSec || 3;
-    const fps = cfg.fps || 30;
-
-    const loopFrames = fps * durationSec;
-    const totalFrames = loopFrames; // Simple loop for now
-
-    const f = frameCount % totalFrames;
-    this.t = (f % loopFrames) / loopFrames;
-
-    try {
-      if (this.sketch && this.sketch.draw) {
-        this.sketch.draw(this.t, this.currentParams);
-      }
-    } catch (e) {
-      console.error("Draw error:", e);
-      noLoop();
+  updateParams(newParams) {
+    console.log("GifApp: updateParams called with", newParams);
+    this.currentParams = { ...this.currentParams, ...newParams };
+    if (this.p5Instance && typeof this.p5Instance.updateParams === "function") {
+      this.p5Instance.updateParams(this.currentParams);
     }
+  }
 
-    // Capture frame if recording
-    if (this.captureManager.isRecording) {
-      // We might need to pass delta time or frame info if CaptureManager needs it
-      // But based on previous implementation, it captures from canvas stream or manually
-      // If using MediaRecorder with stream, we don't strictly need to call anything per frame
-      // UNLESS we are manually pushing frames (like CCapture).
-      // Current CaptureManager seems to use MediaRecorder on stream, so it runs automatically.
-      // However, let's check if we need to notify it.
+  loadImageParam(key, dataUrl) {
+    if (this.p5Instance) {
+      this.p5Instance.loadImage(dataUrl, (img) => {
+        const updates = {};
+        updates[key] = img;
+        this.updateParams(updates);
+      });
     }
+  }
+
+  setDuration(sec) {
+    this.baseDuration = sec;
+    this.totalDuration = this.baseDuration * this.loopCount;
+  }
+
+  setLoopCount(count) {
+    this.loopCount = count;
+    this.totalDuration = this.baseDuration * this.loopCount;
   }
 }
 
-let gifApp = null;
-
-function setup() {
-  // Ensure config exists
-  const defaults = {
-    width: 512,
-    height: 512,
-    fps: 30,
-    durationSec: 3,
-    format: "webm"
-  };
-
-  gifApp = new GifApp(typeof GIF_DEFAULT_CONFIG !== 'undefined' ? GIF_DEFAULT_CONFIG : defaults, "default");
-  gifApp.setup();
-}
-
-function draw() {
-  if (gifApp) gifApp.draw();
-}
+const app = new GifApp();
+window.onload = () => app.setup();

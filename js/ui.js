@@ -1,28 +1,36 @@
-// ui.js
+// js/ui.js
 
 class UIController {
   constructor(captureManager, app) {
     this.captureManager = captureManager;
     this.app = app;
     this.editor = null;
+    this.mode = "player"; // 'player' or 'creator'
 
     // Elements
     this.btnStart = document.getElementById("btn-start");
     this.btnStop = document.getElementById("btn-stop");
     this.statusEl = document.getElementById("status");
-    this.btnUpload = document.getElementById("btn-upload");
+    this.btnUpload = document.getElementById("btn-upload"); // Now "Record & Upload"
     this.uploadResult = document.getElementById("upload-result");
-    this.selectSketch = document.getElementById("select-sketch");
-    this.inputDuration = document.getElementById("input-duration");
-    this.selectSize = document.getElementById("select-size");
+
+    this.btnModeCreator = document.getElementById("btn-mode-creator");
+    this.btnModePlayer = document.getElementById("btn-mode-player");
+    this.btnModeGallery = document.getElementById("btn-mode-gallery");
+
+    this.creatorControls = document.getElementById("creator-controls");
+    this.mainPanel = document.getElementById("main-panel");
+    this.galleryPanel = document.getElementById("gallery-panel");
+    this.galleryGrid = document.getElementById("gallery-grid");
+
+    this.paramsContainer = document.getElementById("params-container");
+    this.paramsHeader = document.querySelector(".panel-section h3"); // "Parameters" header
+
+    this.btnSaveSketch = document.getElementById("btn-save-sketch");
+    this.btnRunCode = document.getElementById("btn-run-code");
+
     this.previewArea = document.getElementById("preview-area");
     this.previewVideo = document.getElementById("preview-video");
-    this.latestList = document.getElementById("latest-list");
-
-    // Tabs
-    this.tabs = document.querySelectorAll(".tab-btn");
-    this.tabContents = document.querySelectorAll(".tab-content");
-    this.btnRunCode = document.getElementById("btn-run-code");
 
     this.currentBlob = null;
 
@@ -32,7 +40,8 @@ class UIController {
   init() {
     this.bindEvents();
     this.initEditor();
-    this.loadLatest();
+    this.loadGallery();
+    this.setMode("gallery"); // Default to Gallery for v2.1
   }
 
   initEditor() {
@@ -46,45 +55,70 @@ class UIController {
       indentUnit: 2,
       tabSize: 2,
     });
+  }
 
-    // Set default code
-    const defaultCode = `// Custom Sketch
-// setup() and draw(t) are required
+  setMode(mode) {
+    this.mode = mode;
+    const editorContainer = document.querySelector(".CodeMirror");
 
-setup = function() {
-  createCanvas(512, 512);
-  colorMode(HSB, 360, 100, 100);
-  noStroke();
-};
+    // Reset Tabs
+    [this.btnModeCreator, this.btnModePlayer, this.btnModeGallery].forEach(btn => {
+      if (btn) btn.classList.remove("active");
+    });
 
-draw = function(t) {
-  background(0);
-  
-  // t goes from 0 to 1
-  let angle = t * TWO_PI;
-  let x = width / 2 + cos(angle) * 100;
-  let y = height / 2 + sin(angle) * 100;
-  
-  fill(200, 80, 100);
-  circle(x, y, 50);
-  
-  fill(255);
-  textAlign(CENTER);
-  text("t: " + nf(t, 1, 2), width/2, height - 20);
-};
-`;
-    this.editor.setValue(defaultCode);
+    // Hide all panels first
+    if (this.mainPanel) this.mainPanel.classList.add("hidden");
+    if (this.galleryPanel) this.galleryPanel.classList.add("hidden");
+    if (this.creatorControls) this.creatorControls.style.display = "none";
+    if (editorContainer) editorContainer.style.display = "none";
+    if (this.paramsContainer) this.paramsContainer.style.display = "none";
+    if (this.paramsHeader) this.paramsHeader.style.display = "none";
+
+    if (mode === "creator") {
+      if (this.btnModeCreator) this.btnModeCreator.classList.add("active");
+      if (this.mainPanel) this.mainPanel.classList.remove("hidden");
+      if (editorContainer) editorContainer.style.display = "block";
+      if (this.creatorControls) this.creatorControls.style.display = "flex";
+      if (this.paramsContainer) this.paramsContainer.style.display = "flex";
+      if (this.paramsHeader) this.paramsHeader.style.display = "block";
+      if (this.editor) this.editor.refresh();
+    } else if (mode === "player") {
+      if (this.btnModePlayer) this.btnModePlayer.classList.add("active");
+      if (this.mainPanel) this.mainPanel.classList.remove("hidden");
+      // Editor hidden, params visible
+      if (this.paramsContainer) this.paramsContainer.style.display = "flex";
+      if (this.paramsHeader) this.paramsHeader.style.display = "block";
+    } else if (mode === "gallery") {
+      if (this.btnModeGallery) this.btnModeGallery.classList.add("active");
+      if (this.galleryPanel) this.galleryPanel.classList.remove("hidden");
+      this.loadGallery(); // Refresh
+      // Params hidden in gallery
+    }
   }
 
   bindEvents() {
+    // Mode Switchers
+    if (this.btnModeCreator) this.btnModeCreator.onclick = () => this.setMode("creator");
+    if (this.btnModePlayer) this.btnModePlayer.onclick = () => this.setMode("player");
+    if (this.btnModeGallery) this.btnModeGallery.onclick = () => this.setMode("gallery");
+
     // Recording Controls
     if (this.btnStart) {
       this.btnStart.addEventListener("click", () => {
         this.captureManager.start();
-        this.updateStatus("Recording...");
+        this.updateStatus(`Recording (${this.app.totalDuration}s)...`);
         this.btnStart.disabled = true;
         this.btnStop.disabled = false;
         if (this.previewArea) this.previewArea.classList.add("hidden");
+
+        // Auto stop
+        setTimeout(() => {
+          if (this.captureManager.isRecording) {
+            this.captureManager.stop();
+            this.btnStart.disabled = false;
+            this.btnStop.disabled = true;
+          }
+        }, this.app.totalDuration * 1000 + 500); // Buffer
       });
     }
 
@@ -96,59 +130,40 @@ draw = function(t) {
       });
     }
 
-    // Upload
+    // Upload Render
     if (this.btnUpload) {
       this.btnUpload.addEventListener("click", () => {
         if (this.currentBlob) {
-          this.performUpload(this.currentBlob);
+          this.performRenderUpload(this.currentBlob);
         }
       });
     }
 
-    // Sketch Selection
-    if (this.selectSketch) {
-      this.selectSketch.addEventListener("change", (e) => {
-        this.app.setSketch(e.target.value);
+    // Save Sketch (Creator)
+    if (this.btnSaveSketch) {
+      this.btnSaveSketch.addEventListener("click", () => {
+        this.saveCurrentSketch();
       });
     }
-
-    // Config Changes
-    if (this.inputDuration) {
-      this.inputDuration.addEventListener("change", (e) => {
-        const val = parseFloat(e.target.value);
-        if (val > 0) this.app.setDuration(val);
-      });
-    }
-
-    if (this.selectSize) {
-      this.selectSize.addEventListener("change", (e) => {
-        const val = parseInt(e.target.value, 10);
-        this.app.setSize(val, val);
-      });
-    }
-
-    // Tabs
-    this.tabs.forEach(tab => {
-      tab.addEventListener("click", () => {
-        this.tabs.forEach(t => t.classList.remove("active"));
-        this.tabContents.forEach(c => c.classList.remove("active"));
-
-        tab.classList.add("active");
-        const targetId = tab.getAttribute("data-tab");
-        document.getElementById(`tab-${targetId}`).classList.add("active");
-
-        // Refresh editor if visible
-        if (targetId === "editor" && this.editor) {
-          setTimeout(() => this.editor.refresh(), 10);
-        }
-      });
-    });
 
     // Run Code
     if (this.btnRunCode) {
       this.btnRunCode.addEventListener("click", () => {
         const code = this.editor.getValue();
         this.app.compileSketch(code);
+      });
+    }
+
+    // Loop Config
+    const loopConfig = document.getElementById("loop-config");
+    if (loopConfig) {
+      loopConfig.addEventListener("change", (e) => {
+        const base = parseInt(e.target.value);
+        const loops = 10 / base;
+        this.app.baseDuration = base;
+        this.app.loopCount = loops;
+        this.app.totalDuration = 10; // Enforce 10s limit
+        console.log(`Loop Config Changed: Base=${base}s, Loops=${loops}, Total=${this.app.totalDuration}s`);
       });
     }
   }
@@ -158,11 +173,23 @@ draw = function(t) {
   }
 
   onCaptureDone(blob, ext = "webm") {
+    console.log("UIController: onCaptureDone called. Blob size:", blob.size);
     this.updateStatus("Recording done. Ready to upload.");
     this.currentBlob = blob;
 
     const localUrl = URL.createObjectURL(blob);
+    console.log("UIController: Preview URL created:", localUrl);
     this.updatePreview(localUrl);
+
+    // Enable upload button
+    if (this.btnUpload) {
+      this.btnUpload.disabled = false;
+      this.btnUpload.textContent = "Upload Render";
+      this.btnUpload.classList.remove("hidden");
+      console.log("UIController: Upload button enabled and shown.");
+    } else {
+      console.error("UIController: btnUpload not found!");
+    }
   }
 
   updatePreview(url) {
@@ -172,40 +199,19 @@ draw = function(t) {
     }
   }
 
-  async performUpload(blob) {
-    this.updateStatus("Uploading...");
+  async performRenderUpload(blob) {
+    this.updateStatus("Uploading Render...");
     if (this.btnUpload) this.btnUpload.disabled = true;
 
     try {
       const metadata = {
-        sketchKey: this.app.currentSketchKey || "custom",
+        sketchId: this.app.currentSketchId || "custom",
         params: this.app.currentParams || {},
-        config: this.app.getCurrentConfig()
+        duration: this.app.totalDuration
       };
 
-      const headers = {
-        "Content-Type": "video/webm",
-        "X-Gifuto-Sketch-Key": metadata.sketchKey,
-        "X-Gifuto-Params": JSON.stringify(metadata.params),
-        "X-Gifuto-Config": JSON.stringify(metadata.config)
-      };
+      const data = await RenderAPI.upload(blob, metadata);
 
-      const res = await fetch(`${BACKEND_BASE_URL}/api/upload`, {
-        method: "POST",
-        headers: headers,
-        body: blob,
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        this.updateStatus("Upload failed: " + res.status);
-        console.error("Upload failed:", res.status, res.statusText, errText);
-        alert("Upload failed!\nStatus: " + res.status + "\nError: " + errText);
-        if (this.btnUpload) this.btnUpload.disabled = false;
-        return;
-      }
-
-      const data = await res.json();
       console.log("Upload success:", data);
       this.updateStatus("Uploaded!");
       this.showUploadResult(data.url);
@@ -214,7 +220,30 @@ draw = function(t) {
     } catch (err) {
       console.error(err);
       this.updateStatus("Upload error");
+      alert("Upload failed: " + err.message);
       if (this.btnUpload) this.btnUpload.disabled = false;
+    }
+  }
+
+  async saveCurrentSketch() {
+    const code = this.editor.getValue();
+    const title = prompt("Enter sketch title:", "My Sketch");
+    if (!title) return;
+
+    try {
+      const sketch = {
+        title,
+        code,
+        paramsSchema: this.app.currentSchema,
+        ownerId: "anon" // Placeholder
+      };
+
+      const res = await SketchAPI.save(sketch);
+      alert("Sketch saved! ID: " + res.id);
+      this.app.currentSketchId = res.id;
+      this.loadGallery(); // Refresh list
+    } catch (e) {
+      alert("Save failed: " + e.message);
     }
   }
 
@@ -226,31 +255,50 @@ draw = function(t) {
     }
   }
 
-  async loadLatest() {
+  async loadGallery() {
     try {
-      const res = await fetch(`${BACKEND_BASE_URL}/api/items/latest?limit=6`);
-      if (!res.ok) return;
-      const items = await res.json();
+      const sketches = await SketchAPI.listLatest(20);
 
-      if (this.latestList) {
-        this.latestList.innerHTML = "";
-        items.forEach(item => {
-          if (!item.url) return; // Skip invalid items
+      if (this.galleryGrid) {
+        this.galleryGrid.innerHTML = "";
 
+        if (sketches.length === 0) {
+          this.galleryGrid.innerHTML = "<p style='padding:20px; color:#888;'>No sketches found. Create one!</p>";
+          return;
+        }
+
+        sketches.forEach(item => {
           const div = document.createElement("div");
-          div.className = "latest-item";
+          div.className = "gallery-item";
+
+          // Placeholder thumbnail (random color or pattern)
+          const hue = Math.floor(Math.random() * 360);
+
           div.innerHTML = `
-            <a href="${item.url}" target="_blank">
-              <video src="${item.url}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>
-            </a>
+            <div class="thumb" style="background: hsl(${hue}, 50%, 20%); display:flex; align-items:center; justify-content:center; color:#555;">
+               <span>Preview</span>
+            </div>
+            <div class="info">
+                <div class="title">${item.title}</div>
+                <div class="author">by Anon</div>
+            </div>
           `;
-          this.latestList.appendChild(div);
+
+          div.onclick = async () => {
+            const fullSketch = await SketchAPI.get(item.id);
+            this.app.currentSketchId = fullSketch.id;
+            this.app.compileSketch(fullSketch.code);
+            if (this.editor) this.editor.setValue(fullSketch.code);
+
+            // Switch to Player Mode
+            this.setMode("player");
+          };
+
+          this.galleryGrid.appendChild(div);
         });
       }
     } catch (e) {
-      console.error("Failed to load latest:", e);
+      console.error("Failed to load gallery:", e);
     }
   }
 }
-
-let UI = null;

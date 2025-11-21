@@ -22,10 +22,11 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    if (message.content.startsWith('!gifusion latest')) {
+    // Command: !gifusion latest (or newest)
+    if (message.content.startsWith('!gifusion latest') || message.content.startsWith('!gifusion newest')) {
         try {
-            // 1. Fetch latest item metadata
-            const res = await fetch(`${API_BASE}/api/items/latest?limit=1`);
+            // Fetch latest renders
+            const res = await fetch(`${API_BASE}/api/renders/latest?limit=1`);
             if (!res.ok) {
                 message.reply(`API Error: ${res.status}`);
                 return;
@@ -41,9 +42,7 @@ client.on('messageCreate', async (message) => {
 
             message.channel.sendTyping();
 
-            // 2. Download the file
-            // Discord needs a Buffer or Stream for attachment if we want it to be treated as a file upload
-            // rather than just a link (which might not auto-embed or loop as nicely).
+            // Download file
             const fileRes = await fetch(fileUrl);
             if (!fileRes.ok) {
                 message.reply("Failed to download video file.");
@@ -53,17 +52,63 @@ client.on('messageCreate', async (message) => {
             const arrayBuffer = await fileRes.arrayBuffer();
             const buffer = Buffer.from(arrayBuffer);
 
-            // 3. Send as attachment
             const attachment = new AttachmentBuilder(buffer, { name: `gifusion-${item.id}.webm` });
 
             await message.channel.send({
-                content: `**Latest Loop**\nID: \`${item.id}\`\nCreated: ${new Date(item.createdAt).toLocaleString()}`,
+                content: `**Latest Render**\nID: \`${item.id}\`\nDuration: ${item.duration}s\nCreated: ${new Date(item.createdAt).toLocaleString()}`,
                 files: [attachment]
             });
 
         } catch (error) {
             console.error(error);
-            message.reply("An error occurred while fetching the latest loop.");
+            message.reply("An error occurred while fetching the latest render.");
+        }
+    }
+
+    // Command: !gifusion send <id>
+    if (message.content.startsWith('!gifusion send ')) {
+        const args = message.content.split(' ');
+        const id = args[2];
+        if (!id) {
+            message.reply("Usage: !gifusion send <id>");
+            return;
+        }
+
+        try {
+            // Fetch render metadata
+            const res = await fetch(`${API_BASE}/api/renders/${id}`);
+            if (res.status === 404) {
+                message.reply("Render not found.");
+                return;
+            }
+            if (!res.ok) {
+                message.reply(`API Error: ${res.status}`);
+                return;
+            }
+
+            const item = await res.json();
+            const fileUrl = item.url;
+
+            message.channel.sendTyping();
+
+            const fileRes = await fetch(fileUrl);
+            if (!fileRes.ok) {
+                message.reply("Failed to download video file.");
+                return;
+            }
+
+            const arrayBuffer = await fileRes.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const attachment = new AttachmentBuilder(buffer, { name: `gifusion-${item.id}.webm` });
+
+            await message.channel.send({
+                content: `**Render: ${item.id}**\nParams: \`${JSON.stringify(item.paramsUsed || {})}\``,
+                files: [attachment]
+            });
+
+        } catch (error) {
+            console.error(error);
+            message.reply("An error occurred while fetching the render.");
         }
     }
 });
