@@ -1,63 +1,104 @@
 <!DOCTYPE html>
 <html lang="ja">
 
+<!DOCTYPE html>
+<html lang="ja">
+
 <head>
   <meta charset="UTF-8" />
-  <title>Gifusion Alpha</title>
+  <title>Gifusion v2</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- CodeMirror -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
 </head>
 
 <body>
-  <button id="btn-start">Record</button>
-  <button id="btn-stop">Stop</button>
-  <div id="status">Idle</div>
-  <div id="download-area"></div>
-  <label>
-    Sketch:
-    <select id="select-sketch">
-      <option value="default">Default</option>
-      <option value="alt">Alt</option>
-    </select>
-  </label>
+  <div class="app-container">
+    <!-- Left Panel: Canvas & Preview -->
+    <div class="left-panel">
+      <header>
+        <h1>Gifusion <span class="version">v2</span></h1>
+      </header>
 
-  <!-- パラメータUI用コンテナ -->
-  <div id="params-container" style="margin: 10px 0; padding: 10px; border: 1px solid #444; background: #222;"></div>
+      <div class="canvas-wrapper">
+        <!-- p5.js canvas will be injected here by default, or we can move it -->
+        <!-- For now, p5 creates canvas at body end, we will move it in js -->
+        <div id="canvas-container"></div>
+      </div>
 
-  <label>
-    Duration(s):
-    <input id="input-duration" type="number" min="0.5" max="10" step="0.5" value="2" />
-  </label>
-  <label>
-    Size:
-    <select id="select-size">
-      <option value="512">512 x 512</option>
-      <option value="720">720 x 720</option>
-    </select>
-  </label>
-  <label>
-    Format:
-    <select id="select-format">
-      <option value="webm">WebM (High)</option>
-      <option value="gif">GIF (Light)</option>
-    </select>
-  </label>
-  <span id="status-text"></span>
-  <div id="status" style="margin-top: 8px; font-size: 14px; color: #aaa">
-    status: idle
+      <div class="controls-area">
+        <div class="playback-controls">
+          <button id="btn-start" class="btn-primary">● Record</button>
+          <button id="btn-stop" class="btn-secondary">■ Stop</button>
+        </div>
+        <div class="status-bar">
+          <span id="status">Ready</span>
+        </div>
+      </div>
+
+      <div id="preview-area" class="hidden">
+        <h3>Preview</h3>
+        <video id="preview-video" width="320" height="320" autoplay muted loop></video>
+        <div class="upload-actions">
+          <button id="btn-upload" class="btn-accent">Upload to Cloud</button>
+          <div id="upload-result"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Editor & Params -->
+    <div class="right-panel">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="presets">Presets</button>
+        <button class="tab-btn" data-tab="editor">Code Editor</button>
+      </div>
+
+      <div id="tab-presets" class="tab-content active">
+        <div class="panel-section">
+          <label>Sketch Preset</label>
+          <select id="select-sketch">
+            <option value="default">Default</option>
+            <option value="alt">Alt</option>
+          </select>
+        </div>
+
+        <div id="params-container" class="params-box">
+          <!-- Dynamic Params -->
+        </div>
+
+        <div class="panel-section">
+          <label>Duration (sec)</label>
+          <input id="input-duration" type="number" min="0.5" max="10" step="0.5" value="2" />
+        </div>
+
+        <div class="panel-section">
+          <label>Size</label>
+          <select id="select-size">
+            <option value="512">512 x 512</option>
+            <option value="720">720 x 720</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="tab-editor" class="tab-content">
+        <div class="editor-toolbar">
+          <button id="btn-run-code" class="btn-small">▶ Run Code</button>
+        </div>
+        <textarea id="code-editor"></textarea>
+      </div>
+
+      <div class="latest-section">
+        <h3>Latest Loops</h3>
+        <div id="latest-list" class="latest-grid"></div>
+      </div>
+    </div>
   </div>
-
-  <div id="upload-result" style="margin-top: 8px">
-    <!-- アップロード後ここにリンクを表示 -->
-  </div>
-  <h2>Latest loops</h2>
-  <div id="latest-list" class="latest-grid">
-    <!-- ここに最新ループが差し込まれる -->
-  </div>
-
-  <video id="preview-video" width="320" height="320" autoplay muted loop></video>
 
   <script src="js/libs/p5.min.js"></script>
-  <script src="js/libs/CCapture.all.min.js"></script>
+  <!-- CCapture removed as per plan -->
 
   <script src="js/config.js"></script>
   <script src="js/capture.js"></script>

@@ -7,17 +7,19 @@ class GifApp {
     this.canvas = null;
 
     this.currentSketchKey = initialSketchKey || "default";
-    // Registry構造変更に対応: .sketch と .params を取得
-    const entry = SketchRegistry[this.currentSketchKey] || SketchRegistry.default;
-    this.sketch = entry.sketch;
-    this.sketchParamsSchema = entry.params;
+    this.sketches = SketchRegistry || {};
+
+    // Registry handling
+    const entry = this.sketches[this.currentSketchKey] || this.sketches.default;
+    this.sketch = entry ? entry.sketch : { setup: () => { }, draw: () => { } };
+    this.sketchParamsSchema = entry ? entry.params : {};
 
     this.t = 0;
-    this.currentParams = {}; // 現在のパラメータ値
+    this.currentParams = {};
 
-    // ParamControllerの初期化
+    // ParamController initialization
     const paramContainer = document.getElementById('params-container');
-    if (paramContainer) {
+    if (paramContainer && typeof ParamController !== 'undefined') {
       this.paramController = new ParamController(paramContainer, (newParams) => {
         this.currentParams = { ...newParams };
       });
@@ -28,13 +30,13 @@ class GifApp {
     const durationInput = document.getElementById("input-duration");
     const sizeSelect = document.getElementById("select-size");
 
-    let durationSec = this.baseConfig.durationSec;
+    let durationSec = this.baseConfig.durationSec || 3;
     if (durationInput) {
       const raw = parseFloat(durationInput.value);
       if (!Number.isNaN(raw) && raw > 0) durationSec = raw;
     }
 
-    let size = this.baseConfig.width;
+    let size = this.baseConfig.width || 512;
     if (sizeSelect) {
       const raw = parseInt(sizeSelect.value, 10);
       if (!Number.isNaN(raw) && raw > 0) size = raw;
@@ -44,7 +46,8 @@ class GifApp {
       ...this.baseConfig,
       width: size,
       height: size,
-      durationSec
+      durationSec,
+      fps: 30
     };
   }
 
@@ -55,110 +58,188 @@ class GifApp {
     const c = createCanvas(cfg.width, cfg.height);
     this.canvas = c.canvas;
 
-    this.captureManager = new CaptureManager(cfg, this.canvas);
-    UI = new UIController(this.captureManager, this);
+    // Initialize CaptureManager
+    if (typeof CaptureManager !== 'undefined') {
+      this.captureManager = new CaptureManager(cfg, this.canvas);
 
-    UI = new UIController(this.captureManager, this);
+      // Initialize UIController
+      if (typeof UIController !== 'undefined') {
+        UI = new UIController(this.captureManager, this);
+        this.captureManager.setUI(UI);
+      }
+    }
 
-    if (this.sketch.setup) this.sketch.setup();
+    this.runCurrentSketch();
 
-    // 初回UI構築
-    if (this.paramController) {
+    // Initial UI build
+    if (this.paramController && this.sketchParamsSchema) {
       this.paramController.buildUI(this.sketchParamsSchema);
       this.currentParams = this.paramController.getParams();
     }
   }
 
-  // ★ UIのsize変更イベントが呼ぶ関数
+  runCurrentSketch() {
+    if (this.sketch && this.sketch.setup) {
+      this.sketch.setup();
+    }
+    background(0);
+  }
+
   updateSizeFromUI() {
     if (this.captureManager && this.captureManager.isRecording) {
-      UI.updateStatus("Recording中はサイズ変更できません");
+      if (UI) UI.updateStatus("Cannot change size while recording");
       return;
     }
 
-    const sizeSelect = document.getElementById("select-size");
-    if (!sizeSelect) return;
+    const cfg = this.getCurrentConfig();
+    this.baseConfig.width = cfg.width;
+    this.baseConfig.height = cfg.height;
 
-    const raw = parseInt(sizeSelect.value, 10);
-    if (Number.isNaN(raw) || raw <= 0) return;
+    resizeCanvas(cfg.width, cfg.height);
 
-    const size = raw;
+    if (this.captureManager) {
+      this.captureManager.updateConfig(cfg);
+    }
 
-    // configを更新
-    this.baseConfig.width = size;
-    this.baseConfig.height = size;
+    this.runCurrentSketch();
 
-    // canvasサイズ変更
-    resizeCanvas(size, size);
-
-    // CaptureManager にサイズを伝える（次回録画に反映）
-    this.captureManager.setSize(size, size);
-
-    // スケッチ再setup
-    if (this.sketch.setup) this.sketch.setup();
-
-    UI.updateStatus(`size: ${size}x${size}`);
-  }
-
-  // ★ GIFモードなどで強制的にサイズ変更する場合
-  forceSize(w, h) {
-    if (this.captureManager && this.captureManager.isRecording) return;
-
-    this.baseConfig.width = w;
-    this.baseConfig.height = h;
-
-    resizeCanvas(w, h);
-    this.captureManager.setSize(w, h);
-
-    if (this.sketch.setup) this.sketch.setup();
-
-    UI.updateStatus(`Forced size: ${w}x${h}`);
+    if (UI) UI.updateStatus(`Size: ${cfg.width}x${cfg.height}`);
   }
 
   setSketch(key) {
-    const entry = SketchRegistry[key];
+    const entry = this.sketches[key];
     if (!entry) return;
 
     this.currentSketchKey = key;
     this.sketch = entry.sketch;
     this.sketchParamsSchema = entry.params;
 
-    if (this.sketch.setup) this.sketch.setup();
+    this.runCurrentSketch();
 
-    // UI再構築
+    // Rebuild UI
     if (this.paramController) {
       this.paramController.buildUI(this.sketchParamsSchema);
-      // 初期値を反映
       this.currentParams = this.paramController.getParams();
+    }
+
+    // Update Editor if UI exists
+    if (UI && UI.editor) {
+      UI.editor.setValue(`// Preset: ${key}\n// Switch to 'Custom' or edit code to override.`);
+    }
+  }
+
+  setDuration(val) {
+    this.baseConfig.durationSec = val;
+    if (this.captureManager) {
+      this.captureManager.updateConfig({ durationSec: val });
+    }
+  }
+
+  setSize(w, h) {
+    this.baseConfig.width = w;
+    this.baseConfig.height = h;
+    resizeCanvas(w, h);
+    if (this.captureManager) {
+      this.captureManager.updateConfig({ width: w, height: h });
+    }
+    this.runCurrentSketch();
+  }
+
+  compileSketch(code) {
+    try {
+      // Create a function from the code string
+      const func = new Function("p5", `
+        let setup = null;
+        let draw = null;
+        
+        ${code}
+        
+        return { setup, draw };
+      `);
+
+      const result = func(window);
+
+      if (result.setup || result.draw) {
+        this.currentSketchKey = "custom";
+        this.sketch = {
+          setup: result.setup || (() => background(0)),
+          draw: result.draw || (() => { }),
+          params: {}
+        };
+        this.sketchParamsSchema = {};
+        this.currentParams = {};
+
+        // Clear params UI
+        if (this.paramController) {
+          document.getElementById('params-container').innerHTML = '<div style="padding:10px; color:#888;">Custom code active</div>';
+        }
+
+        // Re-run setup
+        this.runCurrentSketch();
+
+        if (UI) UI.updateStatus("Code updated!");
+        console.log("Custom sketch compiled successfully");
+      } else {
+        throw new Error("No setup or draw function found in code.");
+      }
+
+    } catch (e) {
+      console.error("Compilation error:", e);
+      if (UI) UI.updateStatus("Error: " + e.message);
+      alert("Code Error:\n" + e.message);
     }
   }
 
   draw() {
-    const cfg = this.captureManager.config;
+    if (!this.captureManager) return;
 
-    const loopFrames = cfg.fps * cfg.durationSec;              // 1周分のフレーム数
-    const repeat = cfg.loopRepeat ?? 1;
-    const totalFrames = loopFrames * repeat;                    // 動画全体のフレーム数
+    const cfg = this.captureManager.config;
+    const durationSec = cfg.durationSec || 3;
+    const fps = cfg.fps || 30;
+
+    const loopFrames = fps * durationSec;
+    const totalFrames = loopFrames; // Simple loop for now
 
     const f = frameCount % totalFrames;
-
-    // t は「1周分」の中で 0〜1 を行き来する
     this.t = (f % loopFrames) / loopFrames;
 
-    this.t = (f % loopFrames) / loopFrames;
+    try {
+      if (this.sketch && this.sketch.draw) {
+        this.sketch.draw(this.t, this.currentParams);
+      }
+    } catch (e) {
+      console.error("Draw error:", e);
+      noLoop();
+    }
 
-    this.sketch.draw(this.t, this.currentParams);
-    this.captureManager.onFrame();
+    // Capture frame if recording
+    if (this.captureManager.isRecording) {
+      // We might need to pass delta time or frame info if CaptureManager needs it
+      // But based on previous implementation, it captures from canvas stream or manually
+      // If using MediaRecorder with stream, we don't strictly need to call anything per frame
+      // UNLESS we are manually pushing frames (like CCapture).
+      // Current CaptureManager seems to use MediaRecorder on stream, so it runs automatically.
+      // However, let's check if we need to notify it.
+    }
   }
 }
 
 let gifApp = null;
 
 function setup() {
-  gifApp = new GifApp(GIF_DEFAULT_CONFIG, "default");
+  // Ensure config exists
+  const defaults = {
+    width: 512,
+    height: 512,
+    fps: 30,
+    durationSec: 3,
+    format: "webm"
+  };
+
+  gifApp = new GifApp(typeof GIF_DEFAULT_CONFIG !== 'undefined' ? GIF_DEFAULT_CONFIG : defaults, "default");
   gifApp.setup();
 }
 
 function draw() {
-  gifApp.draw();
+  if (gifApp) gifApp.draw();
 }

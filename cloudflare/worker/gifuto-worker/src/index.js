@@ -92,14 +92,13 @@ export default {
         const body = new Uint8Array(arrayBuffer);
 
         const now = Date.now();
-        const id = now.toString(36);
+        const id = crypto.randomUUID(); // Use UUID
         const key = `${id}.${ext}`;
 
         await bucket.put(key, body, {
           httpMetadata: { contentType: mime },
         });
 
-        const items = await loadItems(env);
         const publicUrl = `${url.origin}/media/${id}.${ext}`;
 
         // メタデータ取得 (Headerから)
@@ -116,6 +115,9 @@ export default {
           console.warn("metadata parse error", e);
         }
 
+        // Ensure duration is available at top level
+        const duration = config.durationSec || 0;
+
         const item = {
           id,
           url: publicUrl,
@@ -123,12 +125,20 @@ export default {
           sketchKey,
           params,
           config,
+          duration, // Add duration here
           title: "",
           tags: [],
           createdAt: now,
         };
 
+        const items = await loadItems(env);
         items.unshift(item);
+
+        // Limit items to 50 to prevent KV size issues for MVP
+        if (items.length > 50) {
+          items.length = 50;
+        }
+
         await saveItems(env, items);
 
         return jsonResponse({ id, url: publicUrl, format: ext }, 201);
