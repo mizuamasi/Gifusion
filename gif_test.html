@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>CCapture GIF Test</title>
+</head>
+<body>
+  <button id="btn-start">Record GIF</button>
+  <button id="btn-stop">Stop</button>
+  <div id="status">idle</div>
+  <br />
+  <canvas id="mycanvas"></canvas>
+
+  <script src="js/libs/p5.min.js"></script>
+  <script src="js/libs/CCapture.all.min.js"></script>
+
+  <script>
+    let capturer = null;
+    let isRecording = false;
+    let startTime = 0;
+    const durationSec = 2;
+    const fps = 15;
+    let maxMs = durationSec * 1000;
+
+    function setup() {
+      const c = createCanvas(256, 256);
+      c.id('mycanvas');
+      frameRate(fps);
+
+      document.getElementById('btn-start').onclick = () => {
+        if (isRecording) return;
+        if (typeof CCapture === "undefined") {
+          console.error("CCapture is not defined");
+          document.getElementById("status").textContent = "CCapture not loaded";
+          return;
+        }
+        capturer = new CCapture({
+          format: "gif",
+          workersPath: "js/libs/",
+          framerate: fps,
+          quality: 20,
+          width: 256,
+          height: 256,
+        });
+        capturer.start();
+        isRecording = true;
+        startTime = performance.now();
+        maxMs = durationSec * 1000;
+        document.getElementById("status").textContent = "recording...";
+      };
+
+      document.getElementById('btn-stop').onclick = () => {
+        stopCapture();
+      };
+    }
+
+    function stopCapture() {
+      if (!isRecording) return;
+      isRecording = false;
+      if (capturer) {
+        const cap = capturer;
+        capturer = null;
+        cap.stop();
+        document.getElementById("status").textContent = "encoding...";
+        cap.save((blob) => {
+          document.getElementById("status").textContent = "done (downloaded)";
+        });
+      }
+    }
+
+    function draw() {
+      // デバッグログ
+      console.log("test draw tick", frameCount, "isRecording:", isRecording);
+
+      background(0);
+      fill(255);
+      const t = (frameCount % (fps * durationSec)) / (fps * durationSec);
+      const x = width / 2 + Math.cos(t * TWO_PI) * 80;
+      const y = height / 2 + Math.sin(t * TWO_PI) * 80;
+      circle(x, y, 50);
+
+      if (isRecording && capturer) {
+        const elapsed = performance.now() - startTime;
+        console.log("test onFrame", { elapsed, maxMs });
+
+        // try {
+        //   capturer.capture(document.getElementById('mycanvas'));
+        // } catch (e) {
+        //   console.error("CCapture capture error in test:", e);
+        //   stopCapture();
+        // }
+
+        if (elapsed >= maxMs) {
+          console.log("hit maxMs, auto stop");
+          stopCapture();
+        }
+      }
+    }
+  </script>
+</body>
+</html>
