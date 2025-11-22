@@ -13,6 +13,33 @@ class UIController {
     this.inputDuration = document.getElementById("input-duration");
     this.selectSketch = document.getElementById("select-sketch");
     this.selectSize = document.getElementById("select-size");
+    this.selectFont = document.getElementById("select-font");
+
+
+    this.bindEvents();
+    this.loadLatest();
+  }
+
+  // js/ui.js
+
+class UIController {
+  constructor(captureManager, app) {
+    this.captureManager = captureManager;
+    this.app = app;
+
+    this.btnStart = document.getElementById("btn-start");
+    this.btnStop = document.getElementById("btn-stop");
+    this.statusEl = document.getElementById("status");
+    this.downloadArea = document.getElementById("download-area");
+
+    this.inputDuration = document.getElementById("input-duration");
+    this.selectSketch = document.getElementById("select-sketch");
+    this.selectSize = document.getElementById("select-size");
+
+    // 追加
+    this.inputText = document.getElementById("input-text");
+    this.inputTempo = document.getElementById("input-tempo");
+    this.tempoValue = document.getElementById("tempo-value");
 
     this.bindEvents();
     this.loadLatest();
@@ -42,6 +69,30 @@ class UIController {
         this.app.updateSizeFromUI();
       });
     }
+
+    if (this.inputText) {
+      this.inputText.addEventListener("input", () => {
+        this.app.setText(this.inputText.value);
+      });
+    }
+
+    if (this.inputTempo) {
+      this.inputTempo.addEventListener("input", () => {
+        const v = parseFloat(this.inputTempo.value);
+        if (!Number.isNaN(v) && v > 0) {
+          this.app.setTempo(v);
+          if (this.tempoValue) {
+            this.tempoValue.textContent = v.toFixed(1);
+          }
+        }
+      });
+    }
+    if (this.selectFont) {
+      this.selectFont.addEventListener("change", () => {
+        this.app.setFontKey(this.selectFont.value);
+      });
+    }
+
   }
 
   setCaptureManager(cm) {

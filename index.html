@@ -1,74 +1,121 @@
 <!DOCTYPE html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Gifusion Alpha</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
 
-  <body>
-    <button id="btn-start">Record</button>
-    <button id="btn-stop">Stop</button>
-    <div id="status">Idle</div>
-    <div id="download-area"></div>
-    <label>
-      Sketch:
-      <select id="select-sketch">
-        <option value="default">Default</option>
-        <option value="alt">Alt</option>
-      </select>
-    </label>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gifusion v2</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
 
-    <label>
-      Duration(s):
-      <input
-        id="input-duration"
-        type="number"
-        min="0.5"
-        max="10"
-        step="0.5"
-        value="2"
-      />
-    </label>
-    <label>
-      Size:
-      <select id="select-size">
-        <option value="512">512 x 512</option>
-        <option value="720">720 x 720</option>
-      </select>
-    </label>
-    <span id="status-text"></span>
-    <video id="preview-video"></video>
-    <div id="status" style="margin-top: 8px; font-size: 14px; color: #aaa">
-      status: idle
+</head>
+
+<body>
+
+  <header>
+    <h1>Gifusion v2</h1>
+  </header>
+
+  <main>
+    <div class="editor-container">
+      <!-- プレビュー -->
+      <div id="preview-area" class="panel">
+        <div class="canvas-wrapper">
+          <canvas id="p5-canvas"></canvas>
+          <video id="preview-video" width="320" height="320" autoplay muted loop playsinline></video>
+        </div>
+        <div id="upload-result"></div>
+      </div>
+
+      <!-- コントロール -->
+      <div id="controls" class="panel">
+        <div class="control-group">
+          <label>
+            <span class="label-text">Text</span>
+            <input id="input-text" type="text" placeholder="テキストを入力" />
+          </label>
+        </div>
+
+        <div class="control-group">
+          <label>
+            <span class="label-text">Tempo</span>
+            <div class="range-wrapper">
+              <input id="input-tempo" type="range" min="0.5" max="2.0" step="0.1" value="1.0" />
+              <span id="tempo-value">1.0</span>
+            </div>
+          </label>
+        </div>
+
+        <div class="control-group">
+          <label>
+            <span class="label-text">Size</span>
+            <select id="select-size">
+              <option value="256">256 x 256</option>
+              <option value="320" selected>320 x 320</option>
+              <option value="480">480 x 480</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="control-group">
+          <label>
+            <span class="label-text">Template</span>
+            <select id="select-sketch">
+              <option value="default">Default</option>
+              <option value="alt">Alt</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="control-group">
+          <label>
+            <span class="label-text">Duration(s)</span>
+            <input id="input-duration" type="number" min="0.5" max="10" step="0.5" value="2" />
+          </label>
+        </div>
+        <label>
+          Font:
+          <select id="select-font">
+            <option value="system">System</option>
+            <option value="gothic">Gothic</option>
+            <option value="serif">Serif</option>
+          </select>
+        </label>
+
+
+        <div class="button-group">
+          <button id="btn-start" class="primary-btn">生成 (Start)</button>
+          <button id="btn-stop" class="secondary-btn">Stop</button>
+        </div>
+
+        <div id="status">
+          status: idle
+        </div>
+      </div>
     </div>
 
-    <div id="upload-result" style="margin-top: 8px">
-      <!-- アップロード後ここにリンクを表示 -->
-    </div>
-    <h2>Latest loops</h2>
-    <div id="latest-list" class="latest-grid">
-      <!-- ここに最新ループが差し込まれる -->
-    </div>
+    <section class="gallery-container">
+      <h2>Latest loops</h2>
+      <div id="latest-list" class="latest-grid"></div>
+    </section>
+  </main>
 
-    <video
-      id="preview-video"
-      width="320"
-      height="320"
-      autoplay
-      muted
-      loop
-    ></video>
+  <footer>
+    <p>&copy; 2025 Gifusion Project</p>
+  </footer>
 
-    <script src="js/libs/p5.min.js"></script>
-    <!-- <script src="js/libs/CCapture.all.min.js"></script> -->
+  <script src="js/libs/p5.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/capture.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/sketches/sketch_default.js"></script>
+  <script src="js/sketches/sketch_alt.js"></script>
+  <script src="js/sketches/registry.js"></script>
+  <script src="js/app.js"></script>
+</body>
 
-    <script src="js/config.js"></script>
-    <script src="js/capture.js"></script>
-    <script src="js/ui.js"></script>
-    <script src="js/sketches/sketch_default.js"></script>
-    <script src="js/sketches/sketch_alt.js"></script>
-    <script src="js/sketches/registry.js"></script>
-    <script src="js/app.js"></script>
-  </body>
 </html>
