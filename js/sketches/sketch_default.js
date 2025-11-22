@@ -8,7 +8,7 @@ const DefaultSketch = {
   },
 
   // t: 0〜1, text: 入力文字列, tempo: 速度倍率
-  draw(t, text, tempo) {
+  draw(t, message, tempo) {
     background(0);
     fill(255);
 
@@ -18,7 +18,7 @@ const DefaultSketch = {
     const y = height / 2 + Math.sin(t * TWO_PI * speed) * 40;
 
     // テキストが空ならフォールバック表示
-    const msg = (text && text.trim().length > 0) ? text : "Hello!";
+    const msg = (message && message.trim().length > 0) ? text : "Hello!";
 
     text(msg, width / 2, y);
   }
