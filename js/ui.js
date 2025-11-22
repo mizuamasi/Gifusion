@@ -1,25 +1,3 @@
-// ui.js
-
-class UIController {
-  constructor(captureManager, app) {
-    this.captureManager = captureManager;
-    this.app = app;
-
-    this.btnStart = document.getElementById("btn-start");
-    this.btnStop = document.getElementById("btn-stop");
-    this.statusEl = document.getElementById("status");
-    this.downloadArea = document.getElementById("download-area");
-
-    this.inputDuration = document.getElementById("input-duration");
-    this.selectSketch = document.getElementById("select-sketch");
-    this.selectSize = document.getElementById("select-size");
-    this.selectFont = document.getElementById("select-font");
-
-
-    this.bindEvents();
-    this.loadLatest();
-  }
-
   // js/ui.js
 
 class UIController {
