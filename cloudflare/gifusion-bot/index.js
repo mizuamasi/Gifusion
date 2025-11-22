@@ -76,12 +76,31 @@ const commands = [
 
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
+// async function registerCommands() {
+//   await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {
+//     body: commands,
+//   });
+//   console.log("Slash commands registered");
+// }
 async function registerCommands() {
-  await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {
-    body: commands,
-  });
-  console.log("Slash commands registered");
+  try {
+    console.log("Registering GLOBAL commands as app:", CLIENT_ID);
+    const data = await rest.put(
+      Routes.applicationCommands(CLIENT_ID), // ★ここを変える
+      { body: commands }
+    );
+    console.log(
+      "Registered global commands:",
+      data.map((c) => `${c.name} (${c.id})`)
+    );
+  } catch (err) {
+    console.error("Failed to register global commands");
+    console.error(err.rawError ?? err);
+    process.exit(1);
+  }
 }
+
+
 
 // ---------------- Bot本体 ----------------
 
@@ -116,7 +135,7 @@ client.on("interactionCreate", async (interaction) => {
     const url = `${FRONTEND_BASE_URL}/?${params.toString()}`;
 
     await interaction.reply({
-      content: `ここで編集して生成しろ：\n${url}`,
+      content: `ここで編集して生成：\n${url}`,
       ephemeral: true, // DMっぽく返す
     });
     return;
@@ -142,7 +161,7 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.editReply(item.url || "(urlがない)");
     } catch (e) {
       console.error(e);
-      await interaction.editReply("エラーで死んだ。ログを見ろ。");
+      await interaction.editReply("エラーで死んだ。ログを見て。");
     }
     return;
   }

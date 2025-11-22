@@ -64,7 +64,9 @@ main {
   border: 1px solid var(--border-color);
 }
 
-/* Preview Area */
+/* ================================
+   Preview Area
+================================ */
 #preview-area {
   flex: 1;
   display: flex;
@@ -73,34 +75,39 @@ main {
   min-width: 300px;
 }
 
+/* キャンバスと動画を完全に重ねる */
 .canvas-wrapper {
   position: relative;
   width: 320px;
   height: 320px;
   background: #000;
   border: 1px solid var(--border-color);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  overflow: hidden;
 }
 
-#p5-canvas {
+.canvas-wrapper canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: block;
-  /* canvas is handled by p5, usually absolute or block */
 }
 
-#preview-video {
+.canvas-wrapper video {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
-  display: none;
-  /* Initially hidden or controlled by JS */
+  pointer-events: none;
+  display: none; /* JS が必要に応じて表示 */
 }
 
-/* Controls */
+/* ================================
+   Controls
+================================ */
 #controls {
   flex: 1;
   max-width: 400px;
@@ -115,7 +122,6 @@ main {
 }
 
 .label-text {
-  display: block;
   margin-bottom: 0.5rem;
   font-weight: 600;
   font-size: 0.9rem;
@@ -136,7 +142,6 @@ select {
 
 input[type="range"] {
   width: 100%;
-  cursor: pointer;
 }
 
 .range-wrapper {
@@ -148,7 +153,6 @@ input[type="range"] {
 .button-group {
   display: flex;
   gap: 1rem;
-  margin-top: 1rem;
 }
 
 button {
@@ -159,7 +163,6 @@ button {
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
 }
 
 .primary-btn {
@@ -181,13 +184,14 @@ button {
 }
 
 #status {
-  margin-top: 0.5rem;
+  text-align: center;
   font-size: 0.85rem;
   color: #888;
-  text-align: center;
 }
 
-/* Upload Result */
+/* ================================
+   Upload Result
+================================ */
 #upload-result {
   margin-top: 1rem;
   text-align: center;
@@ -198,7 +202,9 @@ button {
   color: var(--accent-color);
 }
 
-/* Gallery */
+/* ================================
+   Gallery
+================================ */
 .gallery-container {
   margin-top: 2rem;
 }
@@ -206,7 +212,6 @@ button {
 .gallery-container h2 {
   text-align: center;
   margin-bottom: 1.5rem;
-  font-weight: 600;
 }
 
 .latest-grid {
@@ -218,8 +223,8 @@ button {
 .latest-item {
   background: var(--panel-bg);
   border-radius: 8px;
-  overflow: hidden;
   border: 1px solid var(--border-color);
+  overflow: hidden;
   aspect-ratio: 1;
 }
 

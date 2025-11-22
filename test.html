@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+<script>
+let pg;
+
+const vertSrc = `
+  precision mediump float;
+  attribute vec3 aPosition;
+  attribute vec2 aTexCoord;
+  varying vec2 vTexCoord;
+  void main() {
+    vTexCoord = aTexCoord;
+    gl_Position = vec4(aPosition, 1.0);
+  }
+`;
+
+const fragSrc = `
+  precision mediump float;
+  varying vec2 vTexCoord;
+  void main() {
+    gl_FragColor = vec4(vTexCoord.x, vTexCoord.y, 0.0, 1.0);
+  }
+`;
+
+let sh;
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(320, 320);
+  pg = createGraphics(320, 320, WEBGL);
+  pg.pixelDensity(1);
+  sh = pg.createShader(vertSrc, fragSrc);
+}
+
+function draw() {
+  background(0);
+
+  pg.shader(sh);
+  pg.push();
+  pg.resetMatrix();
+  pg.rectMode(pg.CENTER);
+  pg.noStroke();
+  pg.rect(0, 0, pg.width, pg.height);
+  pg.pop();
+
+  image(pg, 0, 0, width, height);
+}
+</script>
+</body>
+</html>

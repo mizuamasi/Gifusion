@@ -2,19 +2,30 @@
 
 class GifApp {
   constructor(config, initialSketchKey) {
+    // ベース設定（fps, durationSec など）
     this.baseConfig = { ...config };
+
     this.captureManager = null;
     this.canvas = null;
 
+    // 現在のスケッチ
     this.currentSketchKey = initialSketchKey || "default";
-    this.sketch = SketchRegistry[this.currentSketchKey] || DefaultSketch;
+    this.sketch =
+      (window.SketchRegistry && window.SketchRegistry[this.currentSketchKey]) ||
+      null;
 
-    this.t = 0;
+    // 時間・状態
+    this.t = 0; // 0〜1 のループ位置
+    this.localFrame = 0; // 独自フレームカウンタ
+
+    // 表現パラメータ
     this.fontKey = "system";
-
-    // 追加
     this.text = "";
     this.tempo = 1.0;
+  }
+
+  resetLoop() {
+    this.localFrame = 0;
   }
 
   applyParamsFromURL() {
@@ -27,15 +38,21 @@ class GifApp {
     if (textParam !== null) {
       this.text = textParam;
     }
+
     if (tempoParam !== null) {
       const v = parseFloat(tempoParam);
       if (!Number.isNaN(v) && v > 0) {
         this.tempo = v;
       }
     }
-    if (templateParam && SketchRegistry[templateParam]) {
+
+    if (
+      templateParam &&
+      window.SketchRegistry &&
+      window.SketchRegistry[templateParam]
+    ) {
       this.currentSketchKey = templateParam;
-      this.sketch = SketchRegistry[templateParam];
+      this.sketch = window.SketchRegistry[templateParam];
     }
 
     // DOM側にも反映
@@ -56,14 +73,7 @@ class GifApp {
   }
 
   getCurrentConfig() {
-    const durationInput = document.getElementById("input-duration");
     const sizeSelect = document.getElementById("select-size");
-
-    let durationSec = this.baseConfig.durationSec;
-    if (durationInput) {
-      const raw = parseFloat(durationInput.value);
-      if (!Number.isNaN(raw) && raw > 0) durationSec = raw;
-    }
 
     let size = this.baseConfig.width;
     if (sizeSelect) {
@@ -71,32 +81,44 @@ class GifApp {
       if (!Number.isNaN(raw) && raw > 0) size = raw;
     }
 
+    // durationSec は MVP では固定（baseConfig をそのまま使う）
     return {
       ...this.baseConfig,
       width: size,
       height: size,
-      durationSec,
     };
   }
 
   setup() {
-    // URLパラメータ先に反映
+    // URLパラメータ反映（text / tempo / template）
     this.applyParamsFromURL();
 
     const cfg = this.getCurrentConfig();
     this.baseConfig = { ...cfg };
 
+    // p5 canvas を既存の #p5-canvas と差し替え
     const c = createCanvas(cfg.width, cfg.height);
-    document.getElementById("p5-canvas").replaceWith(c.canvas);
+    const placeholder = document.getElementById("p5-canvas");
+    if (placeholder) {
+      placeholder.replaceWith(c.canvas);
+    }
     this.canvas = c.canvas;
 
+    // キャプチャ管理
     this.captureManager = new CaptureManager(cfg, this.canvas);
+
+    // UIコントローラ
+    // UI は ui.js 側で let UI = null; → window.UI にしてある想定
     UI = new UIController(this.captureManager, this);
 
-    if (this.sketch.setup) this.sketch.setup();
+    // スケッチ初期化
+    if (this.sketch && typeof this.sketch.setup === "function") {
+      this.sketch.setup();
+    }
   }
 
-  // UIから呼ばれる setter
+  // ========== UI から呼ばれる setter ==========
+
   setText(text) {
     this.text = text || "";
   }
@@ -121,8 +143,7 @@ class GifApp {
     }
   }
 
-
-  // ★ UIのsize変更イベントが呼ぶ関数
+  // Size 変更（UIの select-size から呼ぶ）
   updateSizeFromUI() {
     if (this.captureManager && this.captureManager.isRecording) {
       UI.updateStatus("Recording中はサイズ変更できません");
@@ -141,55 +162,100 @@ class GifApp {
     this.baseConfig.width = size;
     this.baseConfig.height = size;
 
-    // canvasサイズ変更
+    // p5キャンバスのサイズ変更
     resizeCanvas(size, size);
 
     // CaptureManager にサイズを伝える（次回録画に反映）
-    this.captureManager.setSize(size, size);
+    if (
+      this.captureManager &&
+      typeof this.captureManager.setSize === "function"
+    ) {
+      this.captureManager.setSize(size, size);
+    } else if (this.captureManager) {
+      this.captureManager.config.width = size;
+      this.captureManager.config.height = size;
+    }
+
+    // ---- ★ ここからプレビューまわりのサイズ同期 ----
+    const wrapper = document.querySelector(".canvas-wrapper");
+    const videoEl = document.getElementById("preview-video");
+
+    if (wrapper) {
+      wrapper.style.width = `${size}px`;
+      wrapper.style.height = `${size}px`;
+    }
+
+    if (videoEl) {
+      // 属性値も変えておくとデバッグしやすい
+      videoEl.width = size;
+      videoEl.height = size;
+      // CSSは wrapperに対して100%でOK
+      videoEl.style.width = "100%";
+      videoEl.style.height = "100%";
+    }
+    // ---- ★ ここまで ----
 
     // スケッチ再setup
-    if (this.sketch.setup) this.sketch.setup();
+    if (this.sketch && this.sketch.setup) this.sketch.setup();
 
     UI.updateStatus(`size: ${size}x${size}`);
   }
 
   setSketch(key) {
-    const next = SketchRegistry[key];
+    pixelDensity(1);
+    if (!window.SketchRegistry) return;
+    const next = window.SketchRegistry[key];
     if (!next) return;
 
     this.currentSketchKey = key;
     this.sketch = next;
 
-    if (this.sketch.setup) this.sketch.setup();
+    // リセットして頭から
+    this.resetLoop();
+
+    if (this.sketch && typeof this.sketch.setup === "function") {
+      this.sketch.setup();
+    }
   }
 
+  // ========== メインループ ==========
+
   draw() {
-    const family = this.getFontFamily();
-    textFont(family);
+    if (!this.captureManager) return;
+    if (!this.sketch || typeof this.sketch.draw !== "function") return;
+
+    // 状態リセット
+    resetMatrix();
+    imageMode(CORNER);
+    rectMode(CORNER);
+    textAlign(CENTER, CENTER);
+
     const cfg = this.captureManager.config;
-
-    const loopFrames = cfg.fps * cfg.durationSec;              // 1周分のフレーム数
+    const loopFrames = cfg.fps * cfg.durationSec;
     const repeat = cfg.loopRepeat ?? 1;
-    const totalFrames = loopFrames * repeat;                    // 動画全体のフレーム数
+    const totalFrames = loopFrames * repeat;
+    const f = this.localFrame % totalFrames;
 
-    const f = frameCount % totalFrames;
-
-    // t は「1周分」の中で 0〜1 を行き来する
     this.t = (f % loopFrames) / loopFrames;
 
-    // ★ t, text, tempo を渡す
     this.sketch.draw(this.t, this.text, this.tempo);
     this.captureManager.onFrame();
+
+    this.localFrame++;
   }
 }
 
+// p5 entry point
 let gifApp = null;
 
 function setup() {
+  pixelDensity(1);
   gifApp = new GifApp(GIF_DEFAULT_CONFIG, "default");
   gifApp.setup();
 }
 
 function draw() {
-  gifApp.draw();
+  if (gifApp) {
+    gifApp.draw();
+  }
 }

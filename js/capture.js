@@ -28,6 +28,10 @@ class CaptureManager {
     this.config.height = h;
   }
 
+  setDuration(sec) {
+    this.config.durationSec = sec;
+  }
+
   start() {
     if (this.isRecording) return;
 

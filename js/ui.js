@@ -1,4 +1,4 @@
-  // js/ui.js
+// js/ui.js
 
 class UIController {
   constructor(captureManager, app) {
@@ -21,11 +21,37 @@ class UIController {
 
     this.bindEvents();
     this.loadLatest();
+    this.initUI();
+  }
+
+  initUI() {
+    const sketchSelect = document.getElementById("select-sketch");
+    if (sketchSelect) {
+      sketchSelect.innerHTML = "";
+
+      Object.entries(SketchRegistry).forEach(([key, sketch]) => {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = sketch.label || key;
+        sketchSelect.appendChild(opt);
+      });
+
+      // デフォルト選択
+      if (
+        this.app.currentSketchKey &&
+        SketchRegistry[this.app.currentSketchKey]
+      ) {
+        sketchSelect.value = this.app.currentSketchKey;
+      }
+    }
+
+    // 他のUI初期化…
   }
 
   bindEvents() {
     this.btnStart.addEventListener("click", () => {
-      const raw = parseFloat(this.inputDuration.value);
+      //const raw = parseFloat(this.inputDuration.value);
+      const raw = 2; //inputdurationを無効にしているため
       if (!Number.isNaN(raw) && raw > 0) {
         this.captureManager.setDuration(raw);
       }
@@ -70,7 +96,13 @@ class UIController {
         this.app.setFontKey(this.selectFont.value);
       });
     }
-
+    const durationInput = document.getElementById("input-duration");
+    if (durationInput) {
+      durationInput.addEventListener("change", () => {
+        this.app.resetLoop();
+        this.updateStatus("Duration changed → loop reset");
+      });
+    }
   }
 
   setCaptureManager(cm) {
