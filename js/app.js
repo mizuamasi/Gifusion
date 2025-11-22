@@ -87,6 +87,7 @@ class GifApp {
     this.baseConfig = { ...cfg };
 
     const c = createCanvas(cfg.width, cfg.height);
+    document.getElementById("p5-canvas").replaceWith(c.canvas);
     this.canvas = c.canvas;
 
     this.captureManager = new CaptureManager(cfg, this.canvas);
