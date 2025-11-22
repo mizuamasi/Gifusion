@@ -20,8 +20,10 @@ const PRESETS = {
 const GIF_DEFAULT_CONFIG = PRESETS.webm_default;
 
 // config.js
-const BACKEND_BASE_URL = "http://127.0.0.1:8787";
+//const BACKEND_BASE_URL = "http://127.0.0.1:8787";
 // const BACKEND_BASE_URL =
 //   location.hostname === "127.0.0.1" || location.hostname === "localhost"
 //     ? "http://127.0.0.1:8787"   // Local Worker
 //     : "https://gifuto-worker.rekahsnnig.workers.dev";  // Production Worker
+
+const BACKEND_BASE_URL = "https://gifuto-worker.rekahsnnig.workers.dev";

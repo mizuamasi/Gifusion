@@ -10,5 +10,5 @@ id = "b5b96a0144a248bcba744cdced43f0b7"
 preview_id = "b5b96a0144a248bcba744cdced43f0b7"
 
 [[r2_buckets]]
-binding = "GIFUTO_BUCKET"
+binding = "gifuto-media"
 bucket_name = "gifuto-media"
