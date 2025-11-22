@@ -109,6 +109,17 @@ class GifApp {
     this.fontKey = key || "system";
   }
 
+  getFontFamily() {
+    switch (this.fontKey) {
+      case "gothic":
+        return `'Noto Sans JP', system-ui, sans-serif`;
+      case "serif":
+        return `'Yu Mincho', 'Noto Serif JP', serif`;
+      default:
+        return `system-ui, -apple-system, 'Segoe UI', sans-serif`;
+    }
+  }
+
 
   // ★ UIのsize変更イベントが呼ぶ関数
   updateSizeFromUI() {

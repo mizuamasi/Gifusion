@@ -207,3 +207,5 @@ class UIController {
 }
 
 let UI = null;
+window.UIController = UIController;
+window.UI = UI;
