@@ -95,7 +95,7 @@ client.once("ready", () => {
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
-  if (interaction.commandName !== "gifuto") return;
+  if (interaction.commandName !== "gifusion") return;
 
   const sub = interaction.options.getSubcommand();
 
