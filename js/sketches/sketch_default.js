@@ -1,13 +1,25 @@
+// js/sketches/sketch_default.js
+
 const DefaultSketch = {
   setup() {
     textAlign(CENTER, CENTER);
     textSize(48);
     noStroke();
   },
-  draw(t) {
+
+  // t: 0〜1, text: 入力文字列, tempo: 速度倍率
+  draw(t, text, tempo) {
     background(0);
     fill(255);
-    const y = height / 2 + Math.sin(t * TWO_PI) * 50;
-    text(`t=${nf(t, 1, 2)}`, width / 2, y);
+
+    const speed = tempo || 1.0;
+
+    // y位置をテンポに応じて揺らす
+    const y = height / 2 + Math.sin(t * TWO_PI * speed) * 40;
+
+    // テキストが空ならフォールバック表示
+    const msg = (text && text.trim().length > 0) ? text : "Hello!";
+
+    text(msg, width / 2, y);
   }
 };
