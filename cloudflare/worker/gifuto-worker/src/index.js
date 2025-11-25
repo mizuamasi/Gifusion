@@ -38,6 +38,9 @@ function detectExtAndType(contentType) {
   if (ct.startsWith("video/webm")) {
     return { ext: "webm", mime: "video/webm" };
   }
+  if (ct.startsWith("video/mp4")) {               // ← 追加
+    return { ext: "mp4", mime: "video/mp4" };     // ← 追加
+  }
   if (ct === "image/gif") {
     return { ext: "gif", mime: "image/gif" };
   }
@@ -48,14 +51,17 @@ function detectExtAndType(contentType) {
   throw new Error("unsupported content-type: " + contentType);
 }
 
+
 // 拡張子からざっくり MIME を決める（R2 から取り出すとき用）
 function guessMimeFromExt(ext) {
   const e = (ext || "").toLowerCase();
   if (e === "webm") return "video/webm";
+  if (e === "mp4") return "video/mp4";            // ← 追加
   if (e === "gif") return "image/gif";
   if (e === "webp") return "image/webp";
   return "application/octet-stream";
 }
+
 
 export default {
   async fetch(request, env, ctx) {
